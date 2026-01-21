@@ -1,6 +1,10 @@
 <template>
   <div class="game-sub-container">
-    <canvas ref="canvasRef" @touchstart="handleTouch" @touchmove.prevent="handleTouch"></canvas>
+    <canvas
+      ref="canvasRef"
+      @touchstart="handleTouchStart"
+      @touchmove.prevent="handleTouchMove"
+    ></canvas>
 
     <!-- HUD: 游戏进行时或暂停时的界面 -->
     <div v-if="localState === 'playing' || localState === 'paused'" class="hud">
@@ -23,7 +27,7 @@
 
         <!-- 右侧：暂停控制按钮 -->
         <div class="hud-section right">
-          <button class="pause-btn" @click="togglePause">
+          <button class="pause-btn" @click.stop="togglePause">
             <span :class="{ 'pause-icon': localState === 'playing', 'play-icon': localState === 'paused' }">
               {{ localState === 'playing' ? '‖' : '▶' }}
             </span>
@@ -51,11 +55,11 @@
           <div class="menu-grid">
             <div class="menu-card" @click="localState = 'selectLevel'">
               <h3>🚀 战役模式</h3>
-              <p>挑战 {{ PLANE_CONFIG.levels.length }} 个关卡</p>
+              <p>进度: {{ unlockedLevel }} / {{ PLANE_CONFIG.levels.length }}</p>
             </div>
             <div class="menu-card infinite" @click="prepareGame('infinite')">
               <h3>⚡ 无限模式</h3>
-              <p>挑战生存极限</p>
+              <p>最高分: <span class="gold-text">{{ highScore }}</span></p>
             </div>
           </div>
           <button class="back-btn" @click="$emit('back')">退出大厅</button>
@@ -65,11 +69,17 @@
         <div v-if="localState === 'selectLevel'">
           <h2>选择关卡</h2>
           <div class="level-list">
-            <div v-for="lv in PLANE_CONFIG.levels" :key="lv.id" class="level-item" @click="prepareGame('level', lv.id)">
-              <div class="lv-id">{{ lv.id }}</div>
+            <div v-for="lv in PLANE_CONFIG.levels" :key="lv.id" class="level-item"
+              :class="{ 'locked': lv.id > unlockedLevel }"
+              @click="lv.id <= unlockedLevel ? prepareGame('level', lv.id) : null">
+              <div class="lv-id">
+                <span v-if="lv.id <= unlockedLevel">{{ lv.id }}</span>
+                <span v-else>🔒</span>
+              </div>
               <div class="lv-info">
                 <h4>{{ lv.name }}</h4>
-                <p>目标: {{ lv.targetScore }} 分</p>
+                <p v-if="lv.id <= unlockedLevel">目标: {{ lv.targetScore }} 分</p>
+                <p v-else class="locked-text">需通关第 {{ lv.id - 1 }} 关解锁</p>
               </div>
             </div>
           </div>
@@ -120,6 +130,12 @@ let enemies = [], bullets = [], particles = [], stars = [];
 let lastSpawn = 0, lastShoot = 0, startTime = 0;
 let pauseStartTime = 0; // 用于暂停时间记录
 
+// --- 拖拽状态变量 ---
+let touchStartX = 0;
+let touchStartY = 0;
+let playerStartX = 0;
+let playerStartY = 0;
+
 // --- 计算属性 ---
 const levelConfig = computed(() => {
   return PLANE_CONFIG.levels.find(l => l.id === activeLevel.value) || PLANE_CONFIG.levels[0];
@@ -137,6 +153,40 @@ const scoreStatusClass = computed(() => {
   return '';
 });
 
+// --- 1. 定义存储键名 ---
+const STORAGE_KEYS = {
+  PROGRESS: 'plane_wars_unlocked_level',
+  HIGHSCORE: 'plane_wars_highscore'
+};
+
+// --- 2. 响应式状态 ---
+const unlockedLevel = ref(1); // 当前解锁到的最高关卡
+const highScore = ref(0);     // 无限模式最高分
+
+// --- 3. 持久化方法 ---
+const loadGameData = () => {
+  const savedProgress = localStorage.getItem(STORAGE_KEYS.PROGRESS);
+  const savedHighScore = localStorage.getItem(STORAGE_KEYS.HIGHSCORE);
+
+  if (savedProgress) unlockedLevel.value = parseInt(savedProgress);
+  if (savedHighScore) highScore.value = parseInt(savedHighScore);
+};
+
+const saveProgress = (level) => {
+  // 只有通关当前最高关卡时，才解锁下一关
+  if (level >= unlockedLevel.value) {
+    unlockedLevel.value = level + 1;
+    localStorage.setItem(STORAGE_KEYS.PROGRESS, unlockedLevel.value.toString());
+  }
+};
+
+const updateHighScore = (currentScore) => {
+  if (currentScore > highScore.value) {
+    highScore.value = currentScore;
+    localStorage.setItem(STORAGE_KEYS.HIGHSCORE, highScore.value.toString());
+  }
+};
+
 // --- 游戏控制 ---
 
 // 切换暂停状态
@@ -144,16 +194,16 @@ const togglePause = () => {
   if (localState.value === 'playing') {
     localState.value = 'paused';
     pauseStartTime = Date.now();
-    cancelAnimationFrame(animationId); // 停止循环
+    if (animationId) cancelAnimationFrame(animationId); // 停止动画，省电且防止后台运行
   } else if (localState.value === 'paused') {
-    // 关键：计算暂停了多久，并补偿给所有计时器
+    // 恢复时的时间补偿逻辑
     const pauseDuration = Date.now() - pauseStartTime;
     lastSpawn += pauseDuration;
     lastShoot += pauseDuration;
     startTime += pauseDuration;
 
     localState.value = 'playing';
-    gameLoop(); // 恢复循环
+    gameLoop(); // 重新启动循环
   }
 };
 
@@ -306,6 +356,7 @@ const update = () => {
   let spawnInterval = PLANE_CONFIG.spawnInterval;
   let speedMultiplier = 1;
 
+  // 1. 难度与生成间隔计算
   if (activeMode.value === 'level') {
     speedMultiplier = levelConfig.value.speedMod;
     spawnInterval *= levelConfig.value.spawnMod;
@@ -315,50 +366,89 @@ const update = () => {
     spawnInterval /= (currentDifficulty.value * 0.6 + 0.4);
   }
 
+  // 2. 自动射击逻辑
   if (now - lastShoot > 200) {
     bullets.push({ x: player.x + player.w / 2 - 3, y: player.y - 10, w: 6, h: 16 });
     lastShoot = now;
   }
 
+  // 3. 生成敌人逻辑
   if (now - lastSpawn > spawnInterval) {
     const size = 40 + Math.random() * 10;
     enemies.push({
-      x: Math.random() * (canvasW - size), y: -60, w: size, h: size,
+      x: Math.random() * (canvasW - size),
+      y: -60,
+      w: size,
+      h: size,
       speed: canvasH * PLANE_CONFIG.baseEnemySpeed * speedMultiplier * (0.8 + Math.random() * 0.4)
     });
     lastSpawn = now;
   }
 
+  // 4. 更新子弹位置
   const bSpeed = canvasH * PLANE_CONFIG.baseBulletSpeed;
   for (let i = bullets.length - 1; i >= 0; i--) {
     bullets[i].y -= bSpeed;
     if (bullets[i].y < -20) bullets.splice(i, 1);
   }
 
+  // 5. 更新敌人位置 & 碰撞检测 (hitPlayer 在这里定义)
   for (let i = enemies.length - 1; i >= 0; i--) {
     const e = enemies[i];
     e.y += e.speed;
-    if (isColliding(player, e)) { localState.value = 'gameOver'; return; }
+
+    // --- 在这里定义 hitPlayer ---
+    const hitPlayer = isColliding(player, e);
+
+    if (hitPlayer) {
+      // 玩家被撞
+      createExplosion(player.x + player.w / 2, player.y + player.h / 2);
+
+      // 如果是无限模式，记录最高分
+      if (activeMode.value === 'infinite') {
+        updateHighScore(score.value);
+      }
+
+      localState.value = 'gameOver';
+      return; // 立即跳出更新逻辑
+    }
+
     let enemyDestroyed = false;
     for (let j = bullets.length - 1; j >= 0; j--) {
       if (isColliding(bullets[j], e)) {
         createExplosion(e.x + e.w / 2, e.y + e.h / 2);
         bullets.splice(j, 1);
         enemyDestroyed = true;
-        score.value += 5;
+        score.value += 5; // 击毁得分
+
+        // 检查关卡模式是否胜利
         if (activeMode.value === 'level' && score.value >= levelConfig.value.targetScore) {
+          saveProgress(activeLevel.value); // 解锁下一关
           localState.value = 'win';
+        }
+
+        // 如果是无限模式，实时检查最高分
+        if (activeMode.value === 'infinite') {
+          updateHighScore(score.value);
         }
         break;
       }
     }
-    if (enemyDestroyed) { enemies.splice(i, 1); continue; }
+
+    if (enemyDestroyed) {
+      enemies.splice(i, 1);
+      continue;
+    }
+
     if (e.y > canvasH + 50) enemies.splice(i, 1);
   }
 
+  // 6. 更新爆炸粒子
   for (let i = particles.length - 1; i >= 0; i--) {
     const p = particles[i];
-    p.x += p.vx; p.y += p.vy; p.life -= 0.03;
+    p.x += p.vx;
+    p.y += p.vy;
+    p.life -= 0.03;
     if (p.life <= 0) particles.splice(i, 1);
   }
 };
@@ -391,16 +481,50 @@ const gameLoop = () => {
   animationId = requestAnimationFrame(gameLoop);
 };
 
-const handleTouch = (e) => {
+// --- 1. 手指按下时：记录起始点 ---
+const handleTouchStart = (e) => {
   if (localState.value !== 'playing') return;
-  const t = e.touches[0];
-  player.x = t.clientX - player.w / 2;
-  player.y = t.clientY - player.h - 30;
-  if (player.x < 0) player.x = 0;
-  if (player.x > canvasW - player.w) player.x = canvasW - player.w;
+
+  const touch = e.touches[0];
+  // 记录手指点击的初始坐标
+  touchStartX = touch.clientX;
+  touchStartY = touch.clientY;
+
+  // 记录战机当前的坐标
+  playerStartX = player.x;
+  playerStartY = player.y;
 };
 
-onMounted(() => { initCanvas(); window.addEventListener('resize', initCanvas); });
+// --- 2. 手指滑动时：计算位移并移动 ---
+const handleTouchMove = (e) => {
+  if (localState.value !== 'playing') return;
+
+  const touch = e.touches[0];
+
+  // 计算手指移动的距离 (当前位置 - 初始位置)
+  const deltaX = touch.clientX - touchStartX;
+  const deltaY = touch.clientY - touchStartY;
+
+  // 将位移累加到战机的初始坐标上
+  let newX = playerStartX + deltaX;
+  let newY = playerStartY + deltaY;
+
+  // --- 边界限制 (防止战机飞出屏幕) ---
+  if (newX < 0) newX = 0;
+  if (newX > canvasW - player.w) newX = canvasW - player.w;
+  if (newY < 0) newY = 0;
+  if (newY > canvasH - player.h) newY = canvasH - player.h;
+
+  player.x = newX;
+  player.y = newY;
+};
+
+onMounted(() => {
+  loadGameData();
+
+  initCanvas();
+  window.addEventListener('resize', initCanvas);
+});
 onUnmounted(() => { if (animationId) cancelAnimationFrame(animationId); window.removeEventListener('resize', initCanvas); });
 </script>
 
@@ -426,7 +550,10 @@ canvas {
   left: 0;
   right: 0;
   padding: 0 15px;
-  z-index: 5;
+  z-index: 20;
+  /* 必须高于 game-overlay 的 10，否则暂停后点不到按钮 */
+  pointer-events: none;
+  /* 让大部分区域点击穿透到画布 */
 }
 
 .hud-content {
@@ -439,37 +566,48 @@ canvas {
   border-radius: 12px;
   padding: 8px 15px;
   height: 50px;
-}
-
-/* 必须让 HUD 本身不挡触摸，但按钮需要响应 */
-.hud {
   pointer-events: none;
+  /* 继续穿透 */
 }
 
 .pause-btn {
   /* 基础样式 */
-  background: rgba(255, 255, 255, 0.1);
-  border: none;
+  background: rgba(255, 255, 255, 0.15);
+  border: 1px solid rgba(255, 255, 255, 0.2);
   color: white;
-  width: 32px;
-  height: 32px;
-  border-radius: 8px;
-  font-size: 16px; /* 稍微调小一点，防止图标过大挤压空间 */
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  font-size: 18px;
   cursor: pointer;
 
-  /* 核心修复：居中对齐 */
-  display: flex;          /* 开启弹性布局 */
-  align-items: center;     /* 垂直居中 */
-  justify-content: center; /* 水平居中 */
-  padding: 0;             /* 清除按钮默认内边距 */
-  line-height: 1;         /* 防止行高干扰 */
+  /* 核心：重新开启点击响应 */
+  pointer-events: auto;
+
+  /* 居中对齐修复 */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  transition: all 0.2s;
 }
 
-/* 针对特定图标的微调 */
-.pause-btn span {
-  display: block;
-  /* 如果特定的符号（如 ‖）依然看起来偏下，可以尝试取消下面的注释进行微移 */
-  /* transform: translateY(-1px); */
+.pause-btn:active {
+  transform: scale(0.9);
+  background: rgba(255, 255, 255, 0.3);
+}
+
+/* 暂停/播放图标微调 */
+.pause-icon {
+  transform: translateY(-1px);
+  letter-spacing: -2px;
+  /* 让两条杠靠拢一点 */
+  font-weight: bold;
+}
+
+.play-icon {
+  margin-left: 2px;
+  /* 三角形视觉修正 */
 }
 
 .hud-section {
@@ -547,6 +685,7 @@ canvas {
   background: rgba(0, 0, 0, 0.85);
   display: flex;
   align-items: center;
+  /* 几何居中 */
   justify-content: center;
   z-index: 10;
 }
@@ -562,6 +701,7 @@ canvas {
   padding: 30px;
   text-align: center;
   color: white;
+  transform: translateY(-8%);
 }
 
 .menu-title {
@@ -613,6 +753,15 @@ canvas {
   overflow-y: auto;
 }
 
+/* 自定义关卡列表滚动条 */
+.level-list::-webkit-scrollbar {
+  width: 4px;
+}
+.level-list::-webkit-scrollbar-thumb {
+  background: rgba(56, 189, 248, 0.3);
+  border-radius: 2px;
+}
+
 .level-item {
   display: flex;
   align-items: center;
@@ -623,11 +772,43 @@ canvas {
   border-radius: 12px;
 }
 
+/* 锁定状态样式 */
+.level-item.locked {
+  opacity: 0.5;
+  filter: grayscale(1);
+  cursor: not-allowed;
+  border: 1px dashed rgba(255, 255, 255, 0.2);
+  background: rgba(0, 0, 0, 0.2);
+}
+
+.locked-text {
+  color: #ef4444 !important;
+  font-size: 10px;
+}
+
+/* 最高分金光效果 */
+.gold-text {
+  color: #facc15;
+  font-weight: bold;
+  text-shadow: 0 0 5px rgba(250, 204, 21, 0.5);
+}
+
 .lv-id {
-  font-size: 24px;
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(56, 189, 248, 0.1);
+  border-radius: 50%;
+  font-size: 18px;
   font-weight: bold;
   color: #38bdf8;
-  width: 30px;
+}
+
+.locked .lv-id {
+  background: rgba(255, 255, 255, 0.1);
+  color: #64748b;
 }
 
 .lv-info h4 {
