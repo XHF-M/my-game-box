@@ -45,29 +45,4 @@ header { padding: 40px 0; }
 header h1 { font-size: 2rem; margin: 0; }
 header p { opacity: 0.6; }
 
-.game-grid {
-  display: grid;
-  gap: 20px;
-}
-
-.game-card {
-  background: #1e293b;
-  padding: 20px;
-  border-radius: 16px;
-  display: flex;
-  align-items: center;
-  gap: 20px;
-  border: 1px solid rgba(255,255,255,0.05);
-}
-
-.game-card .icon { font-size: 40px; }
-.game-card h3 { margin: 0; font-size: 1.2rem; }
-.game-card span { font-size: 0.9rem; opacity: 0.5; }
-.game-card.locked { opacity: 0.4; filter: grayscale(1); }
-
-/* 游戏舞台 */
-.game-stage {
-  width: 100vw;
-  height: 100vh;
-}
 </style>

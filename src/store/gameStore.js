@@ -2,7 +2,7 @@ import { defineStore } from 'pinia';
 
 export const useGameStore = defineStore('game', {
   state: () => ({
-    currentGame: null, // 'PlaneWars' | 'Elimination'
+    currentGame: null, // 'PlaneWars' | 'Game2048' | 'Elimination'
   }),
   actions: {
     selectGame(gameId) {

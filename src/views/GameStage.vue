@@ -8,6 +8,11 @@
       @back="store.backToHall"
     />
 
+    <Game2048
+      v-else-if="store.currentGame === 'Game2048'"
+      @back="store.backToHall"
+    />
+
     <div v-else class="error">
       游戏加载失败
       <button @click="store.backToHall">返回</button>
@@ -17,7 +22,8 @@
 
 <script setup>
 import { useGameStore } from '../store/gameStore';
-import PlaneWars from '../apps/PlaneWars/components/PlaneWars.vue'; // 假设你的组件名
+import PlaneWars from '../apps/PlaneWars/components/PlaneWars.vue';
+import Game2048 from '../apps/Game2048/components/Game2048Main.vue';
 const store = useGameStore();
 </script>
 
