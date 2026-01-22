@@ -12,17 +12,16 @@
         <h3>2048</h3>
         <p>经典数字游戏，挑战你的数学能力</p>
       </div>
-      <div class="game-card locked">
+      <div class="game-card" @click="playElimination">
         <div class="icon">🧩</div>
         <h3>消消乐</h3>
-        <p>即将到来...</p>
       </div>
     </div>
   </div>
 </template>
 
 <script setup>
-import { useGameStore } from '../store/gameStore';
+import { useGameStore } from '@/store/gameStore';
 const store = useGameStore();
 
 const playPlaneWars = () => {
@@ -31,6 +30,10 @@ const playPlaneWars = () => {
 
 const playGame2048 = () => {
   store.selectGame('Game2048');
+};
+
+const playElimination = () => {
+  store.selectGame('Elimination');
 };
 </script>
 

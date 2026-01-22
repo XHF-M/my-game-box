@@ -13,6 +13,11 @@
       @back="store.backToHall"
     />
 
+    <EliminationMain
+      v-else-if="store.currentGame === 'Elimination'"
+      @back="store.backToHall"
+    />
+
     <div v-else class="error">
       游戏加载失败
       <button @click="store.backToHall">返回</button>
@@ -21,12 +26,19 @@
 </template>
 
 <script setup>
-import { useGameStore } from '../store/gameStore';
-import PlaneWars from '../apps/PlaneWars/components/PlaneWars.vue';
-import Game2048 from '../apps/Game2048/components/Game2048Main.vue';
+import { useGameStore } from '@/store/gameStore';
+import PlaneWars from '@/apps/PlaneWars/components/PlaneWars.vue';
+import Game2048 from '@/apps/Game2048/components/Game2048Main.vue';
+import EliminationMain from '@/apps/Elimination/components/EliminationMain.vue'
+
 const store = useGameStore();
 </script>
 
 <style scoped>
-.game-stage { width: 100vw; height: 100vh; background: #000; overflow: hidden; }
+.game-stage {
+  width: 100vw;
+  height: 100vh;
+  background: #000;
+  overflow: hidden;
+}
 </style>
