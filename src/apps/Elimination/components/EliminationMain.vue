@@ -5,7 +5,15 @@
       <div class="hud-content">
         <div class="hud-section left">
           <div class="label">MOVES</div>
-          <div class="value-text" :class="{ 'text-danger': movesLeft <= 5 }">{{ movesLeft }}</div>
+          <div
+            class="value-text"
+            :class="{
+              'text-danger': movesLeft <= 5,
+              'gain-steps': isGainingSteps,
+            }"
+          >
+            {{ movesLeft }}
+          </div>
         </div>
 
         <div class="hud-section center">
@@ -13,7 +21,7 @@
           <div class="score-display">
             <span class="current-score">{{ score }}</span>
             <span class="target-divider">/</span>
-            <span class="target-score">{{ levelGoal || '∞' }}</span>
+            <span class="target-score">{{ levelGoal || "∞" }}</span>
           </div>
         </div>
 
@@ -25,12 +33,21 @@
 
     <!-- 2. 游戏棋盘 -->
     <div class="board-wrapper">
-      <div class="board" :class="{ 'processing': isProcessing }">
+      <div class="board" :class="{ processing: isProcessing }">
         <div v-for="(row, r) in board" :key="'r' + r" class="row">
-          <div v-for="(cell, c) in row" :key="'c' + c" class="cell" :class="{ 'selected': isSelected(r, c) }"
-            @click="handleCellClick(r, c)">
+          <div
+            v-for="(cell, c) in row"
+            :key="'c' + c"
+            class="cell"
+            :class="{ selected: isSelected(r, c) }"
+            @click="handleCellClick(r, c)"
+          >
             <transition name="pop">
-              <div v-if="cell" class="tile" :style="{ backgroundColor: cell.color }">
+              <div
+                v-if="cell"
+                class="tile"
+                :style="{ backgroundColor: cell.color }"
+              >
                 {{ cell.icon }}
               </div>
             </transition>
@@ -41,17 +58,20 @@
 
     <!-- 3. 全屏弹窗式遮罩 -->
     <transition name="fade">
-      <div v-if="localState !== 'playing' || showResumePrompt" class="game-overlay">
-
+      <div
+        v-if="localState !== 'playing' || showResumePrompt"
+        class="game-overlay"
+      >
         <div class="modal-card">
-
           <!-- 恢复进度弹窗 -->
           <div v-if="showResumePrompt" class="modal-content">
             <h2 class="modal-title">继续上一局？</h2>
             <p class="modal-desc">检测到未完成的关卡进度</p>
             <div class="btn-group-vertical">
               <button class="primary-btn" @click="resumeGame">继续本局</button>
-              <button class="secondary-btn" @click="discardAndNew">重新开始</button>
+              <button class="secondary-btn" @click="discardAndNew">
+                重新开始
+              </button>
             </div>
           </div>
 
@@ -83,24 +103,39 @@
           <div v-else-if="localState === 'selectLevel'" class="modal-content">
             <h2 class="modal-title">选择关卡</h2>
             <div class="level-list">
-              <div v-for="lv in ELIM_CONFIG.levels" :key="lv.id" class="level-row"
-                :class="{ 'locked': lv.id > unlockedLevel }"
-                @click="lv.id <= unlockedLevel ? initGame('level', lv.id) : null">
-                <div class="lv-badge">{{ lv.id > unlockedLevel ? '🔒' : lv.id }}</div>
+              <div
+                v-for="lv in ELIM_CONFIG.levels"
+                :key="lv.id"
+                class="level-row"
+                :class="{ locked: lv.id > unlockedLevel }"
+                @click="
+                  lv.id <= unlockedLevel ? initGame('level', lv.id) : null
+                "
+              >
+                <div class="lv-badge">
+                  {{ lv.id > unlockedLevel ? "🔒" : lv.id }}
+                </div>
                 <div class="lv-main">
                   <h4>{{ lv.name }}</h4>
                   <p>目标: {{ lv.targetScore }} 分</p>
                 </div>
-                <div v-if="lv.id <= unlockedLevel" class="lv-play-tag">开始</div>
+                <div v-if="lv.id <= unlockedLevel" class="lv-play-tag">
+                  开始
+                </div>
               </div>
             </div>
-            <button class="text-btn" @click="localState = 'selectMode'">返回模式选择</button>
+            <button class="text-btn" @click="localState = 'selectMode'">
+              返回模式选择
+            </button>
           </div>
 
           <!-- 结算界面 -->
-          <div v-else-if="['win', 'gameOver'].includes(localState)" class="modal-content">
+          <div
+            v-else-if="['win', 'gameOver'].includes(localState)"
+            class="modal-content"
+          >
             <h2 :class="localState === 'win' ? 'text-win' : 'text-lose'">
-              {{ localState === 'win' ? '挑战成功!' : '游戏结束' }}
+              {{ localState === "win" ? "挑战成功!" : "游戏结束" }}
             </h2>
             <div class="result-stats">
               <div class="stat-item">
@@ -109,12 +144,24 @@
               </div>
             </div>
             <div class="btn-group-vertical">
-              <button class="primary-btn" @click="initGame(activeMode, activeLevel)">再次挑战</button>
-              <button v-if="localState === 'win' && hasNext" class="success-btn" @click="nextLevel">下一关</button>
-              <button class="secondary-btn" @click="localState = 'selectMode'">返回菜单</button>
+              <button
+                class="primary-btn"
+                @click="initGame(activeMode, activeLevel)"
+              >
+                再次挑战
+              </button>
+              <button
+                v-if="localState === 'win' && hasNext"
+                class="success-btn"
+                @click="nextLevel"
+              >
+                下一关
+              </button>
+              <button class="secondary-btn" @click="localState = 'selectMode'">
+                返回菜单
+              </button>
             </div>
           </div>
-
         </div>
       </div>
     </transition>
@@ -122,46 +169,56 @@
 </template>
 
 <script setup>
-import { ref, onMounted, computed } from 'vue';
-import { ELIM_CONFIG } from '../config';
+import { ref, onMounted, computed } from "vue";
+import { ELIM_CONFIG } from "../config";
 
-const emit = defineEmits(['back']);
+const emit = defineEmits(["back"]);
 
 // --- 存储 Key ---
 const STORAGE = {
-  PROGRESS: 'elim_unlocked_level',
-  HIGHSCORE: 'elim_highscore',
-  SAVE: 'elim_save_data'
+  PROGRESS: "elim_unlocked_level",
+  HIGHSCORE: "elim_highscore",
+  SAVE: "elim_save_data",
 };
 
 const board = ref([]);
 const score = ref(0);
 const movesLeft = ref(0);
-const localState = ref('selectMode');
-const activeMode = ref('level');
+const localState = ref("selectMode");
+const activeMode = ref("level");
 const activeLevel = ref(1);
 const unlockedLevel = ref(1);
 const highScore = ref(0);
 const showResumePrompt = ref(false);
 const isProcessing = ref(false);
 const selectedCell = ref(null);
+const isGainingSteps = ref(false);
 
-const levelGoal = computed(() => activeMode.value === 'level' ? ELIM_CONFIG.levels.find(l => l.id === activeLevel.value)?.targetScore : 0);
-const hasNext = computed(() => ELIM_CONFIG.levels.some(l => l.id === activeLevel.value + 1));
+const levelGoal = computed(() =>
+  activeMode.value === "level"
+    ? ELIM_CONFIG.levels.find((l) => l.id === activeLevel.value)?.targetScore
+    : 0
+);
+const hasNext = computed(() =>
+  ELIM_CONFIG.levels.some((l) => l.id === activeLevel.value + 1)
+);
 
 const loadStorage = () => {
-  unlockedLevel.value = parseInt(localStorage.getItem(STORAGE.PROGRESS) || '1');
-  highScore.value = parseInt(localStorage.getItem(STORAGE.HIGHSCORE) || '0');
+  unlockedLevel.value = parseInt(localStorage.getItem(STORAGE.PROGRESS) || "1");
+  highScore.value = parseInt(localStorage.getItem(STORAGE.HIGHSCORE) || "0");
   if (localStorage.getItem(STORAGE.SAVE)) showResumePrompt.value = true;
 };
 
-const initGame = (mode = 'level', levelId = 1) => {
+const initGame = (mode = "level", levelId = 1) => {
   activeMode.value = mode;
   activeLevel.value = levelId;
   score.value = 0;
-  localState.value = 'playing';
+  localState.value = "playing";
   showResumePrompt.value = false;
-  movesLeft.value = mode === 'level' ? ELIM_CONFIG.levels.find(l => l.id === levelId).moveLimit : 40;
+  movesLeft.value =
+    mode === "level"
+      ? ELIM_CONFIG.levels.find((l) => l.id === levelId).moveLimit
+      : 40;
   generateValidBoard();
   localStorage.removeItem(STORAGE.SAVE);
 };
@@ -173,8 +230,10 @@ const generateValidBoard = () => {
     newBoard[r] = [];
     for (let c = 0; c < size; c++) {
       let pool = [...ELIM_CONFIG.types];
-      if (c >= 2 && newBoard[r][c - 1].id === newBoard[r][c - 2].id) pool = pool.filter(t => t.id !== newBoard[r][c - 1].id);
-      if (r >= 2 && newBoard[r - 1][c].id === newBoard[r - 2][c].id) pool = pool.filter(t => t.id !== newBoard[r - 1][c].id);
+      if (c >= 2 && newBoard[r][c - 1].id === newBoard[r][c - 2].id)
+        pool = pool.filter((t) => t.id !== newBoard[r][c - 1].id);
+      if (r >= 2 && newBoard[r - 1][c].id === newBoard[r - 2][c].id)
+        pool = pool.filter((t) => t.id !== newBoard[r - 1][c].id);
       newBoard[r][c] = pool[Math.floor(Math.random() * pool.length)];
     }
   }
@@ -182,11 +241,14 @@ const generateValidBoard = () => {
 };
 
 const handleCellClick = async (r, c) => {
-  if (isProcessing.value || localState.value !== 'playing') return;
-  if (!selectedCell.value) { selectedCell.value = { r, c }; }
-  else {
-    const p1 = selectedCell.value; const p2 = { r, c };
-    if ((Math.abs(p1.r - p2.r) + Math.abs(p1.c - p2.c)) === 1) await swapAndCheck(p1, p2);
+  if (isProcessing.value || localState.value !== "playing") return;
+  if (!selectedCell.value) {
+    selectedCell.value = { r, c };
+  } else {
+    const p1 = selectedCell.value;
+    const p2 = { r, c };
+    if (Math.abs(p1.r - p2.r) + Math.abs(p1.c - p2.c) === 1)
+      await swapAndCheck(p1, p2);
     selectedCell.value = null;
   }
 };
@@ -195,8 +257,13 @@ const swapAndCheck = async (p1, p2) => {
   isProcessing.value = true;
   swapData(p1, p2);
   let matches = findMatches();
-  if (matches.length > 0) { movesLeft.value--; await processEliminations(); }
-  else { await delay(300); swapData(p1, p2); }
+  if (matches.length > 0) {
+    movesLeft.value--;
+    await processEliminations();
+  } else {
+    await delay(300);
+    swapData(p1, p2);
+  }
   isProcessing.value = false;
   checkGameEnd();
 };
@@ -213,24 +280,70 @@ const findMatches = () => {
   for (let r = 0; r < size; r++) {
     for (let c = 0; c < size - 2; c++) {
       const id = board.value[r][c]?.id;
-      if (id && board.value[r][c + 1]?.id === id && board.value[r][c + 2]?.id === id) matches.push({ r, c }, { r, c: c + 1 }, { r, c: c + 2 });
+      if (
+        id &&
+        board.value[r][c + 1]?.id === id &&
+        board.value[r][c + 2]?.id === id
+      )
+        matches.push({ r, c }, { r, c: c + 1 }, { r, c: c + 2 });
     }
   }
   for (let c = 0; c < size; c++) {
     for (let r = 0; r < size - 2; r++) {
       const id = board.value[r][c]?.id;
-      if (id && board.value[r + 1][c]?.id === id && board.value[r + 2][c]?.id === id) matches.push({ r, c }, { r: r + 1, c }, { r: r + 2, c });
+      if (
+        id &&
+        board.value[r + 1][c]?.id === id &&
+        board.value[r + 2][c]?.id === id
+      )
+        matches.push({ r, c }, { r: r + 1, c }, { r: r + 2, c });
     }
   }
-  return Array.from(new Set(matches.map(m => `${m.r},${m.c}`))).map(s => { const [r, c] = s.split(',').map(Number); return { r, c }; });
+  return Array.from(new Set(matches.map((m) => `${m.r},${m.c}`))).map((s) => {
+    const [r, c] = s.split(",").map(Number);
+    return { r, c };
+  });
 };
 
 const processEliminations = async () => {
   let matches = findMatches();
-  if (matches.length === 0) { saveGame(); return; }
-  matches.forEach(m => board.value[m.r][m.c] = null);
+  if (matches.length === 0) {
+    saveGame();
+    return;
+  }
+
+  // 1. 计算本次消除可以获得的步数奖励 (仅限无限模式)
+  if (activeMode.value === "infinite") {
+    // 基础奖励逻辑：
+    // 消除 3 个：不加步数（抵消掉消耗的那 1 步）
+    // 消除 4 个：+1 步
+    // 消除 5 个及以上：+2 步
+    // 连消（多次触发此函数）：每次额外 +1 步
+    if (matches.length === 3) movesLeft.value += 1;
+    else if (matches.length === 4) movesLeft.value += 2;
+    else if (matches.length >= 5) movesLeft.value += 3;
+
+    // 限制最高步数，防止玩家刷到几千步导致没难度
+    if (movesLeft.value > 50) movesLeft.value = 50;
+
+    const bonus = matches.length >= 3 ? 1 : 0; // 简单逻辑示例
+    if (bonus > 0) {
+      isGainingSteps.value = true;
+      setTimeout(() => (isGainingSteps.value = false), 500);
+    }
+  }
+
+  // 2. 执行消除逻辑
+  matches.forEach((m) => (board.value[m.r][m.c] = null));
   score.value += matches.length * ELIM_CONFIG.scorePerTile;
-  await delay(300); dropTiles(); await delay(300); fillEmpty(); await delay(300);
+
+  await delay(300);
+  dropTiles();
+  await delay(300);
+  fillEmpty();
+  await delay(300);
+
+  // 3. 递归检测连消
   await processEliminations();
 };
 
@@ -240,8 +353,10 @@ const dropTiles = () => {
     let emptyRow = size - 1;
     for (let r = size - 1; r >= 0; r--) {
       if (board.value[r][c] !== null) {
-        const temp = board.value[r][c]; board.value[r][c] = null;
-        board.value[emptyRow][c] = temp; emptyRow--;
+        const temp = board.value[r][c];
+        board.value[r][c] = null;
+        board.value[emptyRow][c] = temp;
+        emptyRow--;
       }
     }
   }
@@ -251,42 +366,73 @@ const fillEmpty = () => {
   const size = ELIM_CONFIG.gridSize;
   for (let r = 0; r < size; r++) {
     for (let c = 0; c < size; c++) {
-      if (!board.value[r][c]) board.value[r][c] = ELIM_CONFIG.types[Math.floor(Math.random() * ELIM_CONFIG.types.length)];
+      if (!board.value[r][c])
+        board.value[r][c] =
+          ELIM_CONFIG.types[
+            Math.floor(Math.random() * ELIM_CONFIG.types.length)
+          ];
     }
   }
 };
 
 const checkGameEnd = () => {
-  if (activeMode.value === 'level') {
+  if (activeMode.value === "level") {
     if (score.value >= levelGoal.value) {
-      localState.value = 'win';
-      if (activeLevel.value >= unlockedLevel.value) { unlockedLevel.value = activeLevel.value + 1; localStorage.setItem(STORAGE.PROGRESS, unlockedLevel.value); }
+      localState.value = "win";
+      if (activeLevel.value >= unlockedLevel.value) {
+        unlockedLevel.value = activeLevel.value + 1;
+        localStorage.setItem(STORAGE.PROGRESS, unlockedLevel.value);
+      }
       localStorage.removeItem(STORAGE.SAVE);
-    } else if (movesLeft.value <= 0) { localState.value = 'gameOver'; localStorage.removeItem(STORAGE.SAVE); }
+    } else if (movesLeft.value <= 0) {
+      localState.value = "gameOver";
+      localStorage.removeItem(STORAGE.SAVE);
+    }
   } else {
-    if (score.value > highScore.value) { highScore.value = score.value; localStorage.setItem(STORAGE.HIGHSCORE, highScore.value); }
+    if (score.value > highScore.value) {
+      highScore.value = score.value;
+      localStorage.setItem(STORAGE.HIGHSCORE, highScore.value);
+    }
   }
 };
 
 const saveGame = () => {
-  const data = { board: board.value, score: score.value, movesLeft: movesLeft.value, activeLevel: activeLevel.value, activeMode: activeMode.value };
+  const data = {
+    board: board.value,
+    score: score.value,
+    movesLeft: movesLeft.value,
+    activeLevel: activeLevel.value,
+    activeMode: activeMode.value,
+  };
   localStorage.setItem(STORAGE.SAVE, JSON.stringify(data));
 };
 
 const resumeGame = () => {
   const data = JSON.parse(localStorage.getItem(STORAGE.SAVE));
-  board.value = data.board; score.value = data.score; movesLeft.value = data.movesLeft;
-  activeLevel.value = data.activeLevel; activeMode.value = data.activeMode;
-  localState.value = 'playing'; showResumePrompt.value = false;
+  board.value = data.board;
+  score.value = data.score;
+  movesLeft.value = data.movesLeft;
+  activeLevel.value = data.activeLevel;
+  activeMode.value = data.activeMode;
+  localState.value = "playing";
+  showResumePrompt.value = false;
 };
 
-const discardAndNew = () => { localStorage.removeItem(STORAGE.SAVE); showResumePrompt.value = false; localState.value = 'selectMode'; };
+const discardAndNew = () => {
+  localStorage.removeItem(STORAGE.SAVE);
+  showResumePrompt.value = false;
+  localState.value = "selectMode";
+};
 
-const confirmExit = () => { if (confirm("确定要放弃本局并返回菜单吗？进度将自动保存。")) localState.value = 'selectMode'; };
+const confirmExit = () => {
+  if (confirm("确定要放弃本局并返回菜单吗？进度将自动保存。"))
+    localState.value = "selectMode";
+};
 
-const nextLevel = () => initGame('level', activeLevel.value + 1);
-const isSelected = (r, c) => selectedCell.value?.r === r && selectedCell.value?.c === c;
-const delay = (ms) => new Promise(res => setTimeout(res, ms));
+const nextLevel = () => initGame("level", activeLevel.value + 1);
+const isSelected = (r, c) =>
+  selectedCell.value?.r === r && selectedCell.value?.c === c;
+const delay = (ms) => new Promise((res) => setTimeout(res, ms));
 
 onMounted(loadStorage);
 </script>
@@ -663,5 +809,11 @@ button {
 .fade-enter-from,
 .fade-leave-to {
   opacity: 0;
+}
+
+.gain-steps {
+  color: #10b981 !important;
+  transform: scale(1.2);
+  transition: all 0.2s;
 }
 </style>
